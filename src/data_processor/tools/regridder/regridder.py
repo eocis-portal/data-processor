@@ -48,7 +48,7 @@ _default_in_path = "/home/dev/data/regrid/sst"
 _default_out_path = "/home/dev/data/regridded"
 
 
-def regrid(lon_min,lon_max,lat_min,lat_max,time_resolution,spatial_resolution,
+def regrid(variables,lon_min,lon_max,lat_min,lat_max,temporal_resolution,spatial_resolution,
                        start_date=_default_start_date,
                        end_date=_default_end_date,
                        input_path=_default_in_path,out_path=_default_out_path,
@@ -56,6 +56,9 @@ def regrid(lon_min,lon_max,lat_min,lat_max,time_resolution,spatial_resolution,
                        comment=""):
     """
     Obtain a time series from SST data.
+
+    :param variables:
+        A list of variable names to extract
 
     :param lon_min:
         The minimum longitude value of the spatial area to aggregate.  Must be aligned on 0.05 degree boundary.
@@ -69,8 +72,8 @@ def regrid(lon_min,lon_max,lat_min,lat_max,time_resolution,spatial_resolution,
     :param lat_max:
         The maximum latitude value of the spatial area to aggregate.  Must be aligned on 0.05 degree boundary.
 
-    :param time_resolution:
-        The time resolution to aggregate, one of "daily","pentad","dekad","monthly" or "N" where N is a number of days >= 1
+    :param temporal_resolution:
+        The temporal resolution to aggregate, one of "daily","pentad","dekad","monthly" or "N" where N is a number of days >= 1
 
     :param spatial_resolution:
         The spatial resolution to aggregate, in degrees lat/lon.  Set to 0 to generate a time series.
@@ -97,7 +100,7 @@ def regrid(lon_min,lon_max,lat_min,lat_max,time_resolution,spatial_resolution,
     os.makedirs(out_path,exist_ok=True)
 
     # create an extractor to read the relevant part of the input data covering the extraction times and spatial boundaries
-    extractor = Extractor(base_folder=input_path,variable_names=["analysed_sst"],t_dim_name=t_dim_name)
+    extractor = Extractor(location=input_path,variable_names=variables,t_dim_name=t_dim_name)
 
     # create an aggregator to aggregate each period in the extracted data
     aggregator = Aggregator(lon_min=lon_min, lat_min=lat_min, lon_max=lon_max,
@@ -105,14 +108,12 @@ def regrid(lon_min,lon_max,lat_min,lat_max,time_resolution,spatial_resolution,
                             t_dim_name=t_dim_name)
 
     # create a formatter (either CSV or netcdf4 based) to handle writing the aggregated data to file
-
-
     formatter = NetCDF4Formatter(out_path,"")
 
     period_duration = end_date.timestamp() - start_date.timestamp()
 
     # loop over each time period in the required date range...
-    for (dates,slice_data) in extractor.generateData(start_dt=start_date, end_dt=end_date, time_resolution=time_resolution,
+    for (dates,slice_data) in extractor.generateData(start_dt=start_date, end_dt=end_date, temporal_resolution=temporal_resolution,
                                                     min_lon=lon_min, min_lat=lat_min, max_lon=lon_max, max_lat=lat_max):
 
         # get the first,middle and end date of the period
@@ -129,10 +130,10 @@ def regrid(lon_min,lon_max,lat_min,lat_max,time_resolution,spatial_resolution,
 
 def createParser():
     import argparse
-    parser = argparse.ArgumentParser(description='extract SST data time series.')
+    parser = argparse.ArgumentParser(description='extract regridded data.')
 
 
-    parser.add_argument('--time-resolution', default="5-day",
+    parser.add_argument('--temporal-resolution', default="5-day",
                         help="The target time resolution. This can be 'monthly', 'daily'," +
                         "'10-day' for dekads, '5-day' for pentads or an integer for regular " +
                         " N day regridding aligned with the start of the year, or daily.")
@@ -184,6 +185,9 @@ def createParser():
     parser.add_argument('--out-path', default=_default_out_path,
                         help='The path in which to write the output.')
 
+    parser.add_argument('--variables', default="",
+                        help='Supply a comma separated list of variables.')
+
     parser.add_argument('--comment', type=str, default="",
                         help='Supply an extra comment string to be added to the output file.')
 
@@ -194,8 +198,9 @@ def dispatch(args):
     start_dt = datetime.datetime(args.start_year, args.start_month, args.start_day, 12, 0, 0)
     end_dt = datetime.datetime(args.end_year, args.end_month, args.end_day, 12, 0, 0)
 
-    regrid(lon_min=args.lon_min, lat_min=args.lat_min, lon_max=args.lon_max, lat_max=args.lat_max,
-                       time_resolution=args.time_resolution, spatial_resolution=args.spatial_resolution,
+    variables = list(map(lambda name: name.strip(), args.variables.split(",")))
+    regrid(variables=variables,lon_min=args.lon_min, lat_min=args.lat_min, lon_max=args.lon_max, lat_max=args.lat_max,
+                       temporal_resolution=args.temporal_resolution, spatial_resolution=args.spatial_resolution,
                        start_date=start_dt, end_date=end_dt,
                        out_path=args.out_path, input_path=args.in_path,
                        comment=args.comment)

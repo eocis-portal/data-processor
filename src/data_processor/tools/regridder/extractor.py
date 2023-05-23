@@ -31,33 +31,33 @@ from .utils import createTimePeriods
 class Extractor(object):
 
     """
-    This class handles the efficient extraction of data from the input (spatially resliced CCI/C3S/Climatology files)
+    This class handles the efficient extraction of data from the input datset
     for the exact time and space bounded regions to be processed, and providing an iterator to lazily return data
     for each discrete time period.
     """
 
-    def __init__(self,base_folder, variable_names:list[str], t_dim_name:str):
+    def __init__(self, location, variable_names:list[str], t_dim_name:str):
         """
         Constructor
 
-        :param base_folder:
-            the folder where the input (spatially resliced) dataset is stored.
+        :param location:
+            the location of the input dataset
         :param variable_names:
             list of variable names to include
         :param t_dim_name:
             the name of the time dimension
         """
-        self.base_folder = base_folder
+        self.location = location
         self.variable_names = variable_names
         self.t_dim_name = t_dim_name
 
 
-    def generateYearData(self,start_date,end_date,time_resolution,min_lon,min_lat,max_lon,max_lat):
+    def generateYearData(self,start_date,end_date,temporal_resolution,min_lon,min_lat,max_lon,max_lat):
         """Generator that yields the time period within a year
 
         :param start_date: the datetime of the start day (inclusive).  Time must be set to mid day.
-        :param end_date: the datetime of the end day (inclusive).  Time must be set to mid day.
-        :param time_resolution:  the time resolution as "daily"|"pentad"|"dekad"|"N" where N is an integer number of days
+        :param end_date: the datetime of the end day (inclusive).  Time must be set to mid day.  Must be in same year as start_date.
+        :param temporal_resolution:  the time resolution as "daily"|"pentad"|"dekad"|"N" where N is an integer number of days
         :param min_lon:  minimum longitude of box, must be aligned on 0.05 degree boundary
         :param min_lat:  minimum latitude of box, must be aligned on 0.05 degree boundary
         :param max_lon:  maximum longitude of box, must be aligned on 0.05 degree boundary
@@ -66,24 +66,23 @@ class Extractor(object):
         The generator yields ((start_dt,mid_dt,end_dt),dataset) tuples
         """
 
-        input_path = os.path.join(self.base_folder,"%d"%(start_date.year),"*","*","*.nc")
+        input_path = self.location.replace("{YEAR}",str(start_date.year))
         z = xarray.open_mfdataset(input_path)
 
         drop_variables = [name for name in z.variables.keys() if name not in self.variable_names and name not in z.dims]
-        print(drop_variables)
         z = z.drop_vars(drop_variables)
 
-        time_periods = createTimePeriods(time_resolution,start_date,end_date)
+        time_periods = createTimePeriods(temporal_resolution,start_date,end_date)
 
         for(period_start_dt,period_mid_dt,period_end_dt) in time_periods:
             yield ((period_start_dt,period_mid_dt,period_end_dt),z)
 
-    def generateData(self, start_dt, end_dt, time_resolution, min_lon, min_lat, max_lon, max_lat):
+    def generateData(self, start_dt, end_dt, temporal_resolution, min_lon, min_lat, max_lon, max_lat):
         """Generator that lazily yields the time period data for a given time and space range
 
         :param start_date: the datetime of the start day (inclusive).  Time must be set to mid day.
         :param end_date: the datetime of the end day (inclusive).  Time must be set to mid day.
-        :param time_resolution:  the time resolution as "daily"|"pentad"|"dekad"|"N" where N is an integer number of days
+        :param temporal_resolution:  the time resolution as "daily"|"pentad"|"dekad"|"N" where N is an integer number of days
         :param min_lon:  minimum longitude of box, must be aligned on 0.05 degree boundary
         :param min_lat:  minimum latitude of box, must be aligned on 0.05 degree boundary
         :param max_lon:  maximum longitude of box, must be aligned on 0.05 degree boundary
@@ -97,7 +96,7 @@ class Extractor(object):
             slice_end_dt = datetime.datetime(year,12,31,12,0,0) if year < end_dt.year else end_dt
             slice_start_dt = datetime.datetime(year,1,1,12,0,0) if year > start_dt.year else start_dt
             # yield from that year's generator until exhausted
-            yield from self.generateYearData(slice_start_dt,slice_end_dt,time_resolution,min_lon,min_lat,max_lon,max_lat)
+            yield from self.generateYearData(slice_start_dt,slice_end_dt,temporal_resolution,min_lon,min_lat,max_lon,max_lat)
             # move to the next year
             year += 1
 
