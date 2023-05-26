@@ -41,17 +41,14 @@ from .extractor import Extractor
 from .aggregator import Aggregator
 from .netcdf4formatter import NetCDF4Formatter
 
-_default_start_date = datetime.datetime(2022,1,1)
-_default_end_date = datetime.datetime(2022,12,31)
 
-_default_in_path = "/home/dev/data/regrid/sst"
-_default_out_path = "/home/dev/data/regridded"
 
 
 def regrid(variables,lon_min,lon_max,lat_min,lat_max,temporal_resolution,spatial_resolution,
-                       start_date=_default_start_date,
-                       end_date=_default_end_date,
-                       input_path=_default_in_path,out_path=_default_out_path,
+                       start_date,
+                       end_date,
+                       input_path,out_path,
+                       output_name_pattern,
                        y_dim_name="lat", x_dim_name="lon", t_dim_name="time",
                        comment=""):
     """
@@ -84,6 +81,9 @@ def regrid(variables,lon_min,lon_max,lat_min,lat_max,temporal_resolution,spatial
     :param output_path:
         Path to write the time series data.  Must be a filename, data will be written in CSV format if the file extension is .csv
 
+    :param output_name_pattern:
+        Filename pattern to write.
+
     :param y_dim_name:
         Name of the y/lat dimension in the dataset
 
@@ -108,7 +108,7 @@ def regrid(variables,lon_min,lon_max,lat_min,lat_max,temporal_resolution,spatial
                             t_dim_name=t_dim_name)
 
     # create a formatter (either CSV or netcdf4 based) to handle writing the aggregated data to file
-    formatter = NetCDF4Formatter(out_path,"")
+    formatter = NetCDF4Formatter(out_path,"",output_name_pattern)
 
     period_duration = end_date.timestamp() - start_date.timestamp()
 
@@ -161,29 +161,37 @@ def createParser():
                              'range between -89.95 and +90.00. It must ' +
                              'also be greater than the minimum latitude value.')
 
-    parser.add_argument('--start-year', type=int, default=_default_start_date.year,
+    parser.add_argument('--start-year', type=int,
                         help='The start year of the time series.')
 
-    parser.add_argument('--start-month', type=int, default=_default_start_date.month,
+    parser.add_argument('--start-month', type=int,
                         help='The start month of the time series.')
 
-    parser.add_argument('--start-day', type=int, default=_default_start_date.day,
+    parser.add_argument('--start-day', type=int,
                         help='The start day of the time series.')
 
-    parser.add_argument('--end-year', type=int, default=_default_end_date.year,
+    parser.add_argument('--end-year', type=int,
                         help='The end year of the time series.')
 
-    parser.add_argument('--end-month', type=int, default=_default_end_date.month,
+    parser.add_argument('--end-month', type=int,
                         help='The end month of the time series.')
 
-    parser.add_argument('--end-day', type=int, default=_default_end_date.day,
+    parser.add_argument('--end-day', type=int,
                         help='The end day of the time series.')
 
-    parser.add_argument('--in-path', default=_default_in_path,
+    parser.add_argument('--in-path',
                         help='Path to the input dataset.')
 
-    parser.add_argument('--out-path', default=_default_out_path,
+    parser.add_argument('--out-path',
                         help='The path in which to write the output.')
+
+
+    parser.add_argument(
+        "--output-name-pattern",
+        metavar="<FILE-PATTERN>",
+        help="define a pattern for creating the output file names",
+        default="{Y}{m}{d}{H}{M}{S}-EOCIS-LEVEL-PRODUCT-vVERSION-fv01.0.nc"
+    )
 
     parser.add_argument('--variables', default="",
                         help='Supply a comma separated list of variables.')
@@ -203,6 +211,7 @@ def dispatch(args):
                        temporal_resolution=args.temporal_resolution, spatial_resolution=args.spatial_resolution,
                        start_date=start_dt, end_date=end_dt,
                        out_path=args.out_path, input_path=args.in_path,
+                       output_name_pattern=args.output_name_pattern,
                        comment=args.comment)
 
 

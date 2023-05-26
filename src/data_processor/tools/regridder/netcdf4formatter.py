@@ -24,17 +24,40 @@ class NetCDF4Formatter(object):
     Create a formatter for writing either timeseries or region data to a netcdf4 output file
     """
 
-    def __init__(self,path="",comment=""):
+    def __init__(self,path="", comment="", name_pattern=""):
         """
         Construct the netcdf4 formatter using options
 
         :param path: the output path
         :param comment: an extra string to add to the output file metadata comment
 
+
         """
         self.output_folder = path
         self.comment = comment
+        self.name_pattern = name_pattern
         self.uuid = str(uuid4())
+
+    def get_output_filename(self, timestamp):
+        """
+        Get the output filename based on a filename pattern that contains the following codes:
+          {Y} 4 digit year
+          {y} 2 digit year
+          {m} 2 digit month
+          {d} 2 digit day of month
+          {H} 2 digit hour
+          {M} 2 digit minute
+          {S} 2 digit second
+
+        Args:
+            timestamp: the datetime object representing the acquisition time
+
+        Returns:
+            filename based on the pattern with codes replaced by data from the timestamp
+
+        """
+        subs = dict((f, timestamp.strftime('%' + f)) for f in 'yYmdHMS')
+        return self.name_pattern.format(**subs)
 
     def write(self,start_dt,mid_dt,end_dt,data):
         """
@@ -44,7 +67,7 @@ class NetCDF4Formatter(object):
         :param end_dt: end date of the period
         :param data: an xarray dataset
         """
-        output_path = os.path.join(self.output_folder,str(mid_dt)+".nc")
+        output_path = os.path.join(self.output_folder,self.get_output_filename(mid_dt)+".nc")
         data.to_netcdf(output_path)
 
     def close(self):

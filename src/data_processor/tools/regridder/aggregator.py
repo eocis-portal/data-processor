@@ -68,14 +68,16 @@ class Aggregator(object):
         :return: xarray dataset containing aggregated values
         """
 
+        reverse_lat_order = data[self.y_dim_name].values[0] > data[self.y_dim_name].values[-1]
         data = data.sel({self.t_dim_name:slice(self.format_dt(start_dt),self.format_dt(end_dt)),
-            self.y_dim_name:slice(self.lat_min,self.lat_max),
+            self.y_dim_name:slice(self.lat_max,self.lat_min) if reverse_lat_order else slice(self.lat_min,self.lat_max),
             self.x_dim_name:slice(self.lon_min, self.lon_max)})
 
         nlat = data.sizes[self.y_dim_name]
         nlon = data.sizes[self.x_dim_name]
         ntime = data.sizes[self.t_dim_name]
 
+        print(data.sizes,nlat,nlon,ntime,self.lat_min,self.lat_max)
         if self.spatial_resolution is not None and self.spatial_resolution > 0:
             coarsen_factor_x = round(nlon/((self.lon_max-self.lon_min)/self.spatial_resolution))
             coarsen_factor_y = round(nlat/((self.lat_max - self.lat_min)/self.spatial_resolution))
