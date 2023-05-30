@@ -27,14 +27,16 @@ class TaskRunner:
         pass
 
     def run(self, task):
-        name = task.getTaskName()
+        name = task.get_task_name()
+        conda_path = "/home/dev/miniconda3/bin/conda"
+        if not os.path.exists(conda_path):
+            conda_path = "/home/dev/anaconda3/bin/conda"
         env = {
             "PYTHONPATH": "/home/dev/github/data-processor/src",
-            "CONDA_PATH": "/home/dev/anaconda3/bin/conda",
+            "CONDA_PATH": conda_path,
             "OUT_PATH": "/tmp"
         }
-        for (k,v) in task.getSpec().items():
-            print(k,v)
+        for (k,v) in task.get_spec().items():
             if isinstance(v,list):
                 v= ",".join(v)
             elif isinstance(v,int) or isinstance(v,float):

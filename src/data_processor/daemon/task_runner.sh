@@ -2,7 +2,7 @@
 
 eval "$($CONDA_PATH 'shell.bash' 'hook' 2> /dev/null)"
 
-conda activate xarray
+conda activate data_processor_env
 
 python -m data_processor.tools.regridder.regridder --variables "$VARIABLES" --in-path "$IN_PATH" \
   --out-path $OUT_PATH --output-name-pattern $OUTPUT_NAME_PATTERN \
