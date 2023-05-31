@@ -17,7 +17,7 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-This module ...
+This module slices and aggregates input spatiotemporal data to the desired spatial and temporal resolution
 """
 import datetime
 import xarray as xr
@@ -30,9 +30,10 @@ class Aggregator(object):
 
     """
 
-    def __init__(self, lon_min, lat_min, lon_max, lat_max, spatial_resolution, y_dim_name, x_dim_name, t_dim_name):
+    def __init__(self, lon_min:float, lat_min:float, lon_max:float, lat_max:float, spatial_resolution:float,
+                 y_dim_name:str, x_dim_name:str, t_dim_name:str):
         """
-        Construct the aggregator
+        Construct the aggregator with the given spatial parameters
 
         :param lon_min:  minimum longitude of box, must be aligned on 0.05 degree boundary
         :param lat_min:  minimum latitude of box, must be aligned on 0.05 degree boundary
@@ -54,10 +55,10 @@ class Aggregator(object):
         self.x_dim_name = x_dim_name
         self.t_dim_name = t_dim_name
 
-    def format_dt(self, dt: datetime.datetime):
+    def format_dt(self, dt: datetime.datetime) -> str:
         return dt.strftime("%Y-%m-%d")
 
-    def aggregate(self, start_dt, end_dt, data:xr.Dataset):
+    def aggregate(self, start_dt:datetime.datetime, end_dt:datetime.datetime, data:xr.Dataset) -> xr.Dataset:
         """
         Perform aggregation on the data pertaining to a particular time period
 
@@ -77,7 +78,6 @@ class Aggregator(object):
         nlon = data.sizes[self.x_dim_name]
         ntime = data.sizes[self.t_dim_name]
 
-        print(data.sizes,nlat,nlon,ntime,self.lat_min,self.lat_max)
         if self.spatial_resolution is not None and self.spatial_resolution > 0:
             coarsen_factor_x = round(nlon/((self.lon_max-self.lon_min)/self.spatial_resolution))
             coarsen_factor_y = round(nlat/((self.lat_max - self.lat_min)/self.spatial_resolution))
@@ -92,6 +92,5 @@ class Aggregator(object):
         else:
             # time series, aggregate the whole cube
             data = data.mean(skipna=True)
-        print(self.format_dt(start_dt))
         return data
 

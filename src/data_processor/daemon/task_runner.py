@@ -18,15 +18,25 @@
 
 import os
 from .process_runner import ProcessRunner
+from eocis_data_manager.task import Task
 
 thisdir = os.path.split(__file__)[0]
 
+
 class TaskRunner:
+    """
+    Manage the execution of a task in a sub-process
+    """
 
     def __init__(self):
         pass
 
-    def run(self, task):
+    def run(self, task:Task) -> bool:
+        """
+        Run the task in a sub-process
+        :param task: task to run
+        :return: True iff the task succeeded
+        """
         name = task.get_task_name()
         conda_path = "/home/dev/miniconda3/bin/conda"
         if not os.path.exists(conda_path):

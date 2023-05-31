@@ -17,29 +17,31 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-This module contains common utilities used by the timeseries and region regridding code
+This module contains common utilities used by the regridding code
 """
 
 import datetime
 from math import cos, radians
 from calendar import monthrange
 import numpy as np
+from typing import Union
+
 
 class TimeSeriesUtils(object):
     """
     Implement some handy utility methods to help with time series extraction
     """
 
-    # some metdata uses seconds since 1981
+    # some metadata uses seconds since 1981
     EPOCH = datetime.datetime(1981, 1, 1)
 
     @staticmethod
-    def seconds_since_1981(dt):
+    def seconds_since_1981(dt: datetime.datetime) -> int:
         """Compute the number of seconds since Jan 1st 1982"""
         return int((dt - TimeSeriesUtils.EPOCH).total_seconds())
 
     @staticmethod
-    def createLatitudeWeighting(lat_min, lat_max):
+    def create_latitude_weighting(lat_min: float, lat_max: float) -> np.array:
         """Create an array of latitude area weighting values for the given latitude range"""
         height = round((lat_max - lat_min) / 0.05)
         arraydata = []
@@ -48,30 +50,30 @@ class TimeSeriesUtils(object):
             weight = cos(radians(lat))
             arraydata.append(weight)
         # reshape so can be multiplied along the latitude access of an array organised by (time,latitude,longitude)
-        return np.array(arraydata).reshape(-1,1)
+        return np.array(arraydata).reshape(-1, 1)
 
     @staticmethod
-    def kToDegC(k):
+    def k_to_deg_C(k: float) -> float:
         """Convert from kelvin to degrees centigrade"""
         return k - 273.15
 
     @staticmethod
-    def getDaysInYear(year):
+    def get_days_in_year(year: int) -> int:
         """Get the number of days in a year"""
         d1 = datetime.date(year, 1, 1)
         d2 = datetime.date(year, 12, 31)
         return 1 + (d2 - d1).days
 
     @staticmethod
-    def lastDayInMonth(year, month):
+    def last_day_in_month(year: int, month: int) -> int:
         """Work out how many days there are in a given month"""
         return monthrange(year, month)[1]
 
 
-def createTimePeriods(time_resolution, start_date, end_date):
+def create_time_periods(time_resolution: Union[str, int], start_date: datetime.datetime, end_date: datetime.datetime):
     """Given a time resolution and an inclusive start and end date, find the contained time periods
 
-    :param time_resolution:  the time resolution as "pentad"|"dekad"|"N" where N is an integer number of days
+    :param time_resolution:  the time resolution as "monthly"|"5-day"|"10-day"|N where N is an integer number of days
     :param start_date: the datetime of the start day (inclusive).  Time must be set to mid day.
     :param end_date: the datetime of the end day (inclusive).  Time must be set to mid day.
 
@@ -85,7 +87,7 @@ def createTimePeriods(time_resolution, start_date, end_date):
     """
     periods = []
     dt = start_date
-    last_day_in_end_month = TimeSeriesUtils.lastDayInMonth(end_date.year, end_date.month)
+    last_day_in_end_month = TimeSeriesUtils.last_day_in_month(end_date.year, end_date.month)
 
     # basic date range checks
     if start_date.hour != 12 or start_date.minute != 0 or start_date.second != 0:
@@ -111,7 +113,7 @@ def createTimePeriods(time_resolution, start_date, end_date):
             dt = dt + datetime.timedelta(dim)
     elif time_resolution == "5-day":
         if start_date.day not in [1, 6, 11, 16, 21, 26] or end_date.day not in [5, 10, 15, 20, 25,
-                                                                                TimeSeriesUtils.lastDayInMonth(
+                                                                                TimeSeriesUtils.last_day_in_month(
                                                                                     end_date.year,
                                                                                     end_date.month)]:
             raise Exception("start or end date not correctly aligned for pentads")
@@ -127,8 +129,8 @@ def createTimePeriods(time_resolution, start_date, end_date):
             dt = dt + datetime.timedelta(len_days)
     elif time_resolution == "10-day":
         if start_date.day not in [1, 11, 21] or end_date.day not in [10, 20,
-                                                                     TimeSeriesUtils.lastDayInMonth(end_date.year,
-                                                                                                    end_date.month)]:
+                                                                     TimeSeriesUtils.last_day_in_month(end_date.year,
+                                                                                                       end_date.month)]:
             raise Exception("start or end date not correctly aligned for dekads")
         while dt <= end_date:
             len_days = 10

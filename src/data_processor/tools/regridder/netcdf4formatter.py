@@ -18,27 +18,26 @@
 
 import os.path
 from uuid import uuid4
+import datetime
 
 class NetCDF4Formatter(object):
     """
     Create a formatter for writing either timeseries or region data to a netcdf4 output file
     """
 
-    def __init__(self,path="", comment="", name_pattern=""):
+    def __init__(self,path:str="", name_pattern:str=""):
         """
         Construct the netcdf4 formatter using options
 
-        :param path: the output path
-        :param comment: an extra string to add to the output file metadata comment
-
+        :param path: path of an output folder in which to create the output files
+        :param name_pattern: a pattern to use to create the output file names
 
         """
         self.output_folder = path
-        self.comment = comment
         self.name_pattern = name_pattern
         self.uuid = str(uuid4())
 
-    def get_output_filename(self, timestamp):
+    def get_output_filename(self, timestamp:datetime.datetime):
         """
         Get the output filename based on a filename pattern that contains the following codes:
           {Y} 4 digit year

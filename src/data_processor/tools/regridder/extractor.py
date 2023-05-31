@@ -22,11 +22,10 @@ This module handles the extraction of SST, uncertainty and sea-ice fraction data
 """
 
 import datetime
+import xarray as xr
 
-import xarray
-import os.path
+from .utils import create_time_periods
 
-from .utils import createTimePeriods
 
 class Extractor(object):
 
@@ -36,7 +35,7 @@ class Extractor(object):
     for each discrete time period.
     """
 
-    def __init__(self, location, variable_names:list[str], t_dim_name:str):
+    def __init__(self, location:str, variable_names:list[str], t_dim_name:str):
         """
         Constructor
 
@@ -52,12 +51,12 @@ class Extractor(object):
         self.t_dim_name = t_dim_name
 
 
-    def generateYearData(self,start_date,end_date,temporal_resolution,min_lon,min_lat,max_lon,max_lat):
+    def generate_year_data(self, start_date:datetime.datetime, end_date:datetime.datetime, temporal_resolution, min_lon, min_lat, max_lon, max_lat):
         """Generator that yields the time period within a year
 
         :param start_date: the datetime of the start day (inclusive).  Time must be set to mid day.
         :param end_date: the datetime of the end day (inclusive).  Time must be set to mid day.  Must be in same year as start_date.
-        :param temporal_resolution:  the time resolution as "daily"|"pentad"|"dekad"|"N" where N is an integer number of days
+        :param temporal_resolution:  the time resolution as "daily"|"5-day"|"dekad"|"N" where N is an integer number of days
         :param min_lon:  minimum longitude of box, must be aligned on 0.05 degree boundary
         :param min_lat:  minimum latitude of box, must be aligned on 0.05 degree boundary
         :param max_lon:  maximum longitude of box, must be aligned on 0.05 degree boundary
@@ -67,17 +66,18 @@ class Extractor(object):
         """
 
         input_path = self.location.replace("{YEAR}",str(start_date.year))
-        z = xarray.open_mfdataset(input_path)
+        z = xr.open_mfdataset(input_path)
 
         drop_variables = [name for name in z.variables.keys() if name not in self.variable_names and name not in z.dims]
         z = z.drop_vars(drop_variables)
 
-        time_periods = createTimePeriods(temporal_resolution,start_date,end_date)
+        time_periods = create_time_periods(temporal_resolution,start_date,end_date)
 
         for(period_start_dt,period_mid_dt,period_end_dt) in time_periods:
             yield ((period_start_dt,period_mid_dt,period_end_dt),z)
 
-    def generateData(self, start_dt, end_dt, temporal_resolution, min_lon, min_lat, max_lon, max_lat):
+    def generate_data(self, start_dt:datetime.datetime, end_dt:datetime.datetime, temporal_resolution:str, min_lon:float,
+                      min_lat:float, max_lon:float, max_lat:float):
         """Generator that lazily yields the time period data for a given time and space range
 
         :param start_date: the datetime of the start day (inclusive).  Time must be set to mid day.
@@ -88,7 +88,7 @@ class Extractor(object):
         :param max_lon:  maximum longitude of box, must be aligned on 0.05 degree boundary
         :param max_lat:  maximum latitude of box, must be aligned on 0.05 degree boundary
 
-        The generator yields ((start_dt,mid_dt,end_dt),cf.FieldList) tuples
+        The generator yields ((start_dt,mid_dt,end_dt),xr.Dataset) tuples
         """
         year = start_dt.year
         while year <= end_dt.year:
@@ -96,7 +96,7 @@ class Extractor(object):
             slice_end_dt = datetime.datetime(year,12,31,12,0,0) if year < end_dt.year else end_dt
             slice_start_dt = datetime.datetime(year,1,1,12,0,0) if year > start_dt.year else start_dt
             # yield from that year's generator until exhausted
-            yield from self.generateYearData(slice_start_dt,slice_end_dt,temporal_resolution,min_lon,min_lat,max_lon,max_lat)
+            yield from self.generate_year_data(slice_start_dt, slice_end_dt, temporal_resolution, min_lon, min_lat, max_lon, max_lat)
             # move to the next year
             year += 1
 
