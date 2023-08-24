@@ -66,8 +66,8 @@ class Extractor(object):
         """
 
         input_path = self.location.replace("{YEAR}",str(start_date.year))
-        z = xr.open_mfdataset(input_path)
-
+        z = xr.open_mfdataset(input_path,concat_dim="time",combine="nested",combine_attrs="drop_conflicts",data_vars=self.variable_names)
+        print(z)
         drop_variables = [name for name in z.variables.keys() if name not in self.variable_names and name not in z.dims]
         z = z.drop_vars(drop_variables)
 
