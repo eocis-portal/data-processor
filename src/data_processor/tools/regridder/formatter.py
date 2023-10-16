@@ -16,16 +16,15 @@
 #    You should have received a copy of the GNU Affero General Public License
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import os.path
 from uuid import uuid4
 import datetime
 
-class NetCDF4Formatter(object):
+class Formatter:
     """
-    Create a formatter for writing either timeseries or region data to a netcdf4 output file
+    Create a formatter for writing data to an output file
     """
 
-    def __init__(self,path:str="", name_pattern:str=""):
+    def __init__(self, path: str = "", name_pattern: str = ""):
         """
         Construct the netcdf4 formatter using options
 
@@ -37,7 +36,7 @@ class NetCDF4Formatter(object):
         self.name_pattern = name_pattern
         self.uuid = str(uuid4())
 
-    def get_output_filename(self, timestamp:datetime.datetime):
+    def get_output_filename(self, timestamp: datetime.datetime):
         """
         Get the output filename based on a filename pattern that contains the following codes:
           {Y} 4 digit year
@@ -58,17 +57,8 @@ class NetCDF4Formatter(object):
         subs = dict((f, timestamp.strftime('%' + f)) for f in 'yYmdHMS')
         return self.name_pattern.format(**subs)
 
-    def write(self,start_dt,mid_dt,end_dt,data):
-        """
-        Write an entry to the output file covering a time period
-        :param start_dt: start date of the period
-        :param mid_dt: mid date of the period
-        :param end_dt: end date of the period
-        :param data: an xarray dataset
-        """
-        output_path = os.path.join(self.output_folder,self.get_output_filename(mid_dt)+".nc")
-        data.to_netcdf(output_path)
+    def write(self, start_dt, mid_dt, end_dt, data):
+        pass
 
     def close(self):
         pass
-

@@ -39,8 +39,9 @@ import os.path
 import datetime
 from .extractor import Extractor
 from .aggregator import Aggregator
-from .netcdf4formatter import NetCDF4Formatter
-
+from .netcdf4_formatter import NetCDF4Formatter
+from .csv_formatter import CSVFormatter
+from .geotiff_formatter import GeotiffFormatter
 
 def regrid(variables: list[str], lon_min: float, lon_max: float, lat_min: float, lat_max: float,
            temporal_resolution: str, spatial_resolution: float,
@@ -48,9 +49,10 @@ def regrid(variables: list[str], lon_min: float, lon_max: float, lat_min: float,
            end_date: datetime.datetime,
            input_path: str, output_path: str,
            output_name_pattern: str,
+           output_format: str,
            y_dim_name: str = "lat", x_dim_name: str = "lon", t_dim_name: str = "time"):
     """
-    Obtain a time series from SST data.
+    Obtain an extract from a dataset.
 
     :param variables:
         A list of variable names to extract
@@ -88,6 +90,9 @@ def regrid(variables: list[str], lon_min: float, lon_max: float, lat_min: float,
     :param output_name_pattern:
         Filename pattern to write.
 
+    :param output format:
+        Name of the output format, eg "csv", "netcdf4"
+
     :param y_dim_name:
         Name of the y/lat dimension in the dataset
 
@@ -110,7 +115,15 @@ def regrid(variables: list[str], lon_min: float, lon_max: float, lat_min: float,
                             t_dim_name=t_dim_name)
 
     # create a formatter (either CSV or netcdf4 based) to handle writing the aggregated data to file
-    formatter = NetCDF4Formatter(output_path, output_name_pattern)
+
+    if output_format == "netcdf":
+        formatter = NetCDF4Formatter(output_path, output_name_pattern)
+    elif output_format == "csv":
+        formatter = CSVFormatter(output_path, output_name_pattern)
+    elif output_format == "geotiff":
+        formatter = GeotiffFormatter(output_path, output_name_pattern)
+    else:
+        raise Exception(f"Export format {output_format} is not supported")
 
     period_duration = end_date.timestamp() - start_date.timestamp()
 
@@ -127,7 +140,7 @@ def regrid(variables: list[str], lon_min: float, lon_max: float, lat_min: float,
         # print("slice:",mid_dt,sst_or_anomaly,uncertainty,sea_ice_fraction)
 
         # and append it to the output file
-        formatter.write(s_dt, mid_dt, e_dt, aggregated_data)
+        formatter.write(s_dt, mid_dt, e_dt, aggregated_data,variable_names=variables)
 
     formatter.close()
 
@@ -146,7 +159,7 @@ def createParser():
 
     parser.add_argument('--lon-min', type=float, default=-180,
                         help='The minimum longitude value in degrees. This must ' +
-                             'range between -180.00 and +179.95. It must ' +
+                             'range between -180.00 and +180. It must ' +
                              'also be less than the maximum longitude value.')
 
     parser.add_argument('--lon-max', type=float, default=180,
@@ -161,7 +174,7 @@ def createParser():
 
     parser.add_argument('--lat-max', type=float, default=90,
                         help='The maximum latitude value in degrees. This must ' +
-                             'range between -89.95 and +90.00. It must ' +
+                             'range between -90.00 and +90.00. It must ' +
                              'also be greater than the minimum latitude value.')
 
     parser.add_argument('--start-year', type=int,
@@ -192,7 +205,13 @@ def createParser():
         "--output-name-pattern",
         metavar="<FILE-PATTERN>",
         help="define a pattern for creating the output file names",
-        default="{Y}{m}{d}{H}{M}{S}-EOCIS-LEVEL-PRODUCT-vVERSION-fv01.0.nc"
+        default="{Y}{m}{d}{H}{M}{S}-EOCIS-LEVEL-PRODUCT-vVERSION-fv01.0"
+    )
+    parser.add_argument(
+        "--output-format",
+        metavar="<FORMAT>",
+        help="define the output format",
+        default="netcdf4"
     )
 
     parser.add_argument('--variables', default="",
@@ -211,7 +230,7 @@ def dispatch(args):
            temporal_resolution=args.temporal_resolution, spatial_resolution=args.spatial_resolution,
            start_date=start_dt, end_date=end_dt,
            output_path=args.out_path, input_path=args.in_path,
-           output_name_pattern=args.output_name_pattern)
+           output_name_pattern=args.output_name_pattern, output_format=args.output_format)
 
 
 def main():

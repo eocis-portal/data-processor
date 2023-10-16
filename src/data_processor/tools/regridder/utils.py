@@ -142,10 +142,13 @@ def create_time_periods(time_resolution: Union[str, int], start_date: datetime.d
             dt = dt + datetime.timedelta(len_days)
     else:
         # try to treat time_resolution as an integer number of days
-        try:
-            time_resolution = int(time_resolution)
-        except:
-            raise Exception("Invalid time resolution %s" % (time_resolution))
+        if time_resolution == "daily":
+            time_resolution = 1
+        else:
+            try:
+                time_resolution = int(time_resolution)
+            except:
+                raise Exception("Invalid time resolution %s" % (time_resolution))
         dt = start_date
         while dt <= end_date:
             len_days = time_resolution
