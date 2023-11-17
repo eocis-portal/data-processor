@@ -57,6 +57,7 @@ class Daemon(threading.Thread):
                 if task:
                     task.set_running()
                     jo.update_task(task)
+                    self.job_manager.update_job(task.get_job_id())
                     ran_ok = self.run_task(task, jo)
 
             if ran_ok:
