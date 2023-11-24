@@ -87,8 +87,6 @@ class Daemon(threading.Thread):
             return False
 
 
-
-
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()

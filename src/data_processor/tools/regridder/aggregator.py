@@ -21,6 +21,12 @@ This module slices and aggregates input spatiotemporal data to the desired spati
 """
 import datetime
 import xarray as xr
+import numpy as np
+
+
+def mean_log_reducer(data, axis):
+    return np.power(10, np.nanmean(np.log10(data), axis))
+
 
 class Aggregator(object):
     """
@@ -58,13 +64,14 @@ class Aggregator(object):
     def format_dt(self, dt: datetime.datetime) -> str:
         return dt.strftime("%Y-%m-%d")
 
-    def aggregate(self, start_dt:datetime.datetime, end_dt:datetime.datetime, data:xr.Dataset) -> xr.Dataset:
+    def aggregate(self, start_dt:datetime.datetime, end_dt:datetime.datetime, data:xr.Dataset, methods) -> xr.Dataset:
         """
         Perform aggregation on the data pertaining to a particular time period
 
         :param start_dt: the start date of the period (inclusive)
         :param end_dt: the end date of the period (inclusive)
         :param data: an xarray dataset with the input cube
+        :param methods: the aggregation methods, map from variable name to method eg "SST"=>"mean"
 
         :return: xarray dataset containing aggregated values
         """
@@ -78,19 +85,37 @@ class Aggregator(object):
         nlon = data.sizes[self.x_dim_name]
         ntime = data.sizes[self.t_dim_name]
 
+        # FIXME just use the first aggregation method for everything
+        # need to move to per DataArray aggregation
+        aggregation_method = "mean"
+        for (name,method) in methods.items():
+            aggregation_method = method
+            break
+
+        print("Using aggregation method:"+aggregation_method)
+
         if self.spatial_resolution is not None and self.spatial_resolution > 0:
             coarsen_factor_x = round(nlon/((self.lon_max-self.lon_min)/self.spatial_resolution))
             coarsen_factor_y = round(nlat/((self.lat_max - self.lat_min)/self.spatial_resolution))
             coarsen_factor_t = ntime
 
-            data = data.coarsen({self.y_dim_name:coarsen_factor_y,
+            coarsened_data = data.coarsen({self.y_dim_name:coarsen_factor_y,
                                  self.x_dim_name:coarsen_factor_x,
                                  self.t_dim_name:coarsen_factor_t})
-            data = data.mean(skipna=True)
+            if aggregation_method == "mean":
+                data = coarsened_data.mean(skipna=True)
+            elif aggregation_method == "mean-log":
+                data = coarsened_data.reduce(mean_log_reducer,keep_attrs=True)
+            else:
+                raise Exception(f"Unsupported aggregation method: {method}")
         elif self.spatial_resolution is None:
             pass
         else:
             # time series, aggregate the whole cube
-            data = data.mean(skipna=True)
+            if aggregation_method == "mean":
+                data = data.mean(skipna=True)
+            elif aggregation_method == "mean-log":
+                data = data.reduce(mean_log_reducer, dims=(self.t_dim_name,self.x_dim_name,self.y_dim_name),
+                                   keep_attrs=True, keepdims=False)
         return data
 

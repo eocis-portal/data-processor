@@ -50,6 +50,7 @@ def regrid(variables: list[str], lon_min: float, lon_max: float, lat_min: float,
            input_path: str, output_path: str,
            output_name_pattern: str,
            output_format: str,
+           aggregation_methods: list[str],
            y_dim_name: str = "lat", x_dim_name: str = "lon", t_dim_name: str = "time"):
     """
     Obtain an extract from a dataset.
@@ -90,8 +91,11 @@ def regrid(variables: list[str], lon_min: float, lon_max: float, lat_min: float,
     :param output_name_pattern:
         Filename pattern to write.
 
-    :param output format:
-        Name of the output format, eg "csv", "netcdf4"
+    :param output_format:
+        Name of the output format, eg "csv", "netcdf4", "geotiff"
+
+    :param aggregation_methods:
+        list of aggregation methods, eg ["mean","mean-log"] to apply, must have same length as variables
 
     :param y_dim_name:
         Name of the y/lat dimension in the dataset
@@ -113,6 +117,8 @@ def regrid(variables: list[str], lon_min: float, lon_max: float, lat_min: float,
                             lat_max=lat_max, spatial_resolution=spatial_resolution, x_dim_name=x_dim_name,
                             y_dim_name=y_dim_name,
                             t_dim_name=t_dim_name)
+
+    aggregation_map = { name:method for (name,method) in zip(variables,aggregation_methods) }
 
     # create a formatter (either CSV or netcdf4 based) to handle writing the aggregated data to file
 
@@ -136,7 +142,7 @@ def regrid(variables: list[str], lon_min: float, lon_max: float, lat_min: float,
         (s_dt, mid_dt, e_dt) = dates
 
         # aggregate this time period...
-        aggregated_data = aggregator.aggregate(start_dt=s_dt, end_dt=e_dt, data=slice_data)
+        aggregated_data = aggregator.aggregate(start_dt=s_dt, end_dt=e_dt, data=slice_data, methods=aggregation_map)
         # print("slice:",mid_dt,sst_or_anomaly,uncertainty,sea_ice_fraction)
 
         # and append it to the output file
@@ -207,6 +213,7 @@ def createParser():
         help="define a pattern for creating the output file names",
         default="{Y}{m}{d}{H}{M}{S}-EOCIS-LEVEL-PRODUCT-vVERSION-fv01.0"
     )
+
     parser.add_argument(
         "--output-format",
         metavar="<FORMAT>",
@@ -217,6 +224,14 @@ def createParser():
     parser.add_argument('--variables', default="",
                         help='Supply a comma separated list of variables.')
 
+    parser.add_argument(
+        "--aggregation-methods",
+        metavar="<METHODS>",
+        help="Supply a comma separated list of aggregation methods, eg mean,mean-log"
+    )
+
+
+
     return parser
 
 
@@ -226,11 +241,13 @@ def dispatch(args):
     end_dt = datetime.datetime(args.end_year, args.end_month, args.end_day, 12, 0, 0)
 
     variables = list(map(lambda name: name.strip(), args.variables.split(",")))
+    aggregation_methods = list(map(lambda name: name.strip(), args.aggregation_methods.split(",")))
     regrid(variables=variables, lon_min=args.lon_min, lat_min=args.lat_min, lon_max=args.lon_max, lat_max=args.lat_max,
            temporal_resolution=args.temporal_resolution, spatial_resolution=args.spatial_resolution,
            start_date=start_dt, end_date=end_dt,
            output_path=args.out_path, input_path=args.in_path,
-           output_name_pattern=args.output_name_pattern, output_format=args.output_format)
+           output_name_pattern=args.output_name_pattern, output_format=args.output_format,
+           aggregation_methods=aggregation_methods)
 
 
 def main():
