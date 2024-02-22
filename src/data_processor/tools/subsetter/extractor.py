@@ -22,9 +22,8 @@ This module handles the extraction of a data subset, with aggregation if necessa
 
 import datetime
 import xarray as xr
-
-from .utils import create_time_periods
-
+import os
+import glob
 
 class Extractor(object):
 
@@ -68,37 +67,41 @@ class Extractor(object):
         self.lon_min = lon_min
         self.lon_max = lon_max
 
-
-    def generate_year_data(self, start_date:datetime.datetime, end_date:datetime.datetime, temporal_resolution):
+    def generate_year_data(self, start_date:datetime.datetime, end_date:datetime.datetime):
         """Generator that yields the time period within a year
 
         :param start_date: the datetime of the start day (inclusive).  Time must be set to mid day.
         :param end_date: the datetime of the end day (inclusive).  Time must be set to mid day.  Must be in same year as start_date.
-        :param temporal_resolution:  the time resolution as "daily"|"5-day"|"dekad"|"N" where N is an integer number of days
 
-        The generator yields ((start_dt,mid_dt,end_dt),dataset) tuples
+        The generator yields (mid_dt,dataset,filename) tuples
         """
 
-        input_path = self.location.replace("{YEAR}",str(start_date.year))
-        data = xr.open_mfdataset(input_path,concat_dim="time",combine="nested",combine_attrs="drop_conflicts",data_vars=self.variable_names)
+        dt = start_date
+        while dt <= end_date:
+            input_pattern = self.location.replace("{YEAR}",f"{dt.year:04d}")\
+                .replace("{MONTH}",f"{dt.month:02d}")\
+                .replace("{DAY}",f"{dt.day:02d}")
 
-        drop_variables = [name for name in data.variables.keys() if name not in self.variable_names and name not in data.dims]
-        data = data.drop_vars(drop_variables)
-        reverse_lat_order = data[self.y_dim_name].values[0] > data[self.y_dim_name].values[-1]
-        data = data.sel({self.y_dim_name:slice(self.lat_max,self.lat_min) if reverse_lat_order else slice(self.lat_min,self.lat_max),
-            self.x_dim_name:slice(self.lon_min, self.lon_max)})
+            matched_paths = glob.glob(input_pattern)
+            if len(matched_paths) == 1:
+                input_path = matched_paths[0]
+                input_filename = os.path.split(input_path)[-1]
+                data = xr.open_dataset(input_path)
+                drop_variables = [name for name in data.variables.keys() if name not in self.variable_names and name not in data.dims]
+                data = data.drop_vars(drop_variables)
+                reverse_lat_order = data[self.y_dim_name].values[0] > data[self.y_dim_name].values[-1]
+                data = data.sel({self.y_dim_name:slice(self.lat_max,self.lat_min) if reverse_lat_order else slice(self.lat_min,self.lat_max),
+                    self.x_dim_name:slice(self.lon_min, self.lon_max)})
+                yield (dt,data,input_filename)
+            elif len(matched_paths) > 1:
+                raise Exception("Incorrect configuration - more than 1 files match: "+input_pattern)
+            dt += datetime.timedelta(days=1)
 
-        time_periods = create_time_periods(temporal_resolution,start_date,end_date)
-
-        for(period_start_dt,period_mid_dt,period_end_dt) in time_periods:
-            yield ((period_start_dt,period_mid_dt,period_end_dt),data)
-
-    def generate_data(self, start_dt:datetime.datetime, end_dt:datetime.datetime, temporal_resolution:str):
+    def generate_data(self, start_dt:datetime.datetime, end_dt:datetime.datetime):
         """Generator that lazily yields the time period data for a given time and space range
 
         :param start_date: the datetime of the start day (inclusive).  Time must be set to mid day.
         :param end_date: the datetime of the end day (inclusive).  Time must be set to mid day.
-        :param temporal_resolution:  the time resolution as "daily"|"pentad"|"dekad"|"N" where N is an integer number of days
 
         The generator yields ((start_dt,mid_dt,end_dt),xr.Dataset) tuples
         """
@@ -108,7 +111,7 @@ class Extractor(object):
             slice_end_dt = datetime.datetime(year,12,31,12,0,0) if year < end_dt.year else end_dt
             slice_start_dt = datetime.datetime(year,1,1,12,0,0) if year > start_dt.year else start_dt
             # yield from that year's generator until exhausted
-            yield from self.generate_year_data(slice_start_dt, slice_end_dt, temporal_resolution)
+            yield from self.generate_year_data(slice_start_dt, slice_end_dt)
             # move to the next year
             year += 1
 

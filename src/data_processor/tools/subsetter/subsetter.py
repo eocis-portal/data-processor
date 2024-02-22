@@ -38,19 +38,16 @@ This module can also be invoked by importing and calling the makeTimeSeriesSSTs 
 import os.path
 import datetime
 from .extractor import Extractor
-from .aggregator import Aggregator
+
 from ..common.netcdf4_formatter import NetCDF4Formatter
-from ..common.csv_formatter import CSVFormatter
 from ..common.geotiff_formatter import GeotiffFormatter
 
-def regrid(variables: list[str], lon_min: float, lon_max: float, lat_min: float, lat_max: float,
-           temporal_resolution: str, spatial_resolution: float,
+def subset(variables: list[str], lon_min: float, lon_max: float, lat_min: float, lat_max: float,
            start_date: datetime.datetime,
            end_date: datetime.datetime,
            input_path: str, output_path: str,
            output_name_pattern: str,
            output_format: str,
-           aggregation_methods: list[str],
            y_dim_name: str = "lat", x_dim_name: str = "lon", t_dim_name: str = "time"):
     """
     Obtain an extract from a dataset.
@@ -70,12 +67,6 @@ def regrid(variables: list[str], lon_min: float, lon_max: float, lat_min: float,
     :param lat_max:
         The maximum latitude value of the spatial area to aggregate.  Must be aligned on 0.05 degree boundary.
 
-    :param temporal_resolution:
-        The temporal resolution to aggregate, one of "daily","pentad","dekad","monthly" or "N" where N is a number of days >= 1
-
-    :param spatial_resolution:
-        The spatial resolution to aggregate, in degrees lat/lon.  Set to 0 to generate a time series.
-
     :param start_date:
         The date at which the extracted data should begin.
 
@@ -94,9 +85,6 @@ def regrid(variables: list[str], lon_min: float, lon_max: float, lat_min: float,
     :param output_format:
         Name of the output format, eg "csv", "netcdf4", "geotiff"
 
-    :param aggregation_methods:
-        list of aggregation methods, eg ["mean","mean-log"] to apply, must have same length as variables
-
     :param y_dim_name:
         Name of the y/lat dimension in the dataset
 
@@ -110,42 +98,20 @@ def regrid(variables: list[str], lon_min: float, lon_max: float, lat_min: float,
     os.makedirs(output_path, exist_ok=True)
 
     # create an extractor to read the relevant part of the input data covering the extraction times and spatial boundaries
-    extractor = Extractor(location=input_path, variable_names=variables, x_dim_name=x_dim_name,
-                          y_dim_name=y_dim_name, t_dim_name=t_dim_name,
-                          lon_min=lon_min, lat_min=lat_min, lon_max=lon_max, lat_max=lat_max)
-
-    # create an aggregator to aggregate each period in the extracted data
-    aggregator = Aggregator(spatial_resolution=spatial_resolution, x_dim_name=x_dim_name,
-                            y_dim_name=y_dim_name,
-                            t_dim_name=t_dim_name)
-
-    aggregation_map = { name:method for (name,method) in zip(variables,aggregation_methods) }
-
-    # create a formatter (either CSV or netcdf4 based) to handle writing the aggregated data to file
+    extractor = Extractor(location=input_path, variable_names=variables, y_dim_name=y_dim_name,
+                            x_dim_name=x_dim_name, t_dim_name=t_dim_name, lon_min=lon_min, lat_min=lat_min, lon_max=lon_max,
+                            lat_max=lat_max)
 
     if output_format == "netcdf":
         formatter = NetCDF4Formatter(output_path, output_name_pattern)
-    elif output_format == "csv":
-        formatter = CSVFormatter(output_path, output_name_pattern)
     elif output_format == "geotiff":
         formatter = GeotiffFormatter(output_path, output_name_pattern)
     else:
         raise Exception(f"Export format {output_format} is not supported")
 
-    period_duration = end_date.timestamp() - start_date.timestamp()
-
     # loop over each time period in the required date range...
-    for (dates, slice_data) in extractor.generate_data(start_dt=start_date, end_dt=end_date,
-                                                       temporal_resolution=temporal_resolution):
-        # get the first,middle and end date of the period
-        (s_dt, mid_dt, e_dt) = dates
-
-        # aggregate this time period...
-        aggregated_data = aggregator.aggregate(start_dt=s_dt, end_dt=e_dt, data=slice_data, methods=aggregation_map)
-        # print("slice:",mid_dt,sst_or_anomaly,uncertainty,sea_ice_fraction)
-
-        # and append it to the output file
-        formatter.write(data=aggregated_data, variable_names=variables, start_dt=s_dt, mid_dt=mid_dt, end_dt=e_dt)
+    for (mid_dt, slice_data, filename) in extractor.generate_data(start_dt=start_date, end_dt=end_date):
+        formatter.write(data=slice_data,variable_names=variables,original_filename=filename)
 
     formatter.close()
 
@@ -153,14 +119,6 @@ def regrid(variables: list[str], lon_min: float, lon_max: float, lat_min: float,
 def createParser():
     import argparse
     parser = argparse.ArgumentParser(description='extract regridded data.')
-
-    parser.add_argument('--temporal-resolution', default="5-day",
-                        help="The target time resolution. This can be 'monthly', 'daily'," +
-                             "'10-day' for dekads, '5-day' for pentads or an integer for regular " +
-                             " N day regridding aligned with the start of the year, or daily.")
-
-    parser.add_argument('--spatial-resolution', type=float, default=0.05,
-                        help="The target spatial resolution, in degrees.")
 
     parser.add_argument('--lon-min', type=float, default=-180,
                         help='The minimum longitude value in degrees. This must ' +
@@ -223,11 +181,6 @@ def createParser():
     parser.add_argument('--variables', default="",
                         help='Supply a comma separated list of variables.')
 
-    parser.add_argument(
-        "--aggregation-methods",
-        metavar="<METHODS>",
-        help="Supply a comma separated list of aggregation methods, eg mean,mean-log"
-    )
 
     return parser
 
@@ -238,14 +191,10 @@ def dispatch(args):
     end_dt = datetime.datetime(args.end_year, args.end_month, args.end_day, 12, 0, 0)
 
     variables = list(map(lambda name: name.strip(), args.variables.split(",")))
-    aggregation_methods = list(map(lambda name: name.strip(), args.aggregation_methods.split(",")))
-    regrid(variables=variables, lon_min=args.lon_min, lat_min=args.lat_min, lon_max=args.lon_max, lat_max=args.lat_max,
-           temporal_resolution=args.temporal_resolution, spatial_resolution=args.spatial_resolution,
+    subset(variables=variables, lon_min=args.lon_min, lat_min=args.lat_min, lon_max=args.lon_max, lat_max=args.lat_max,
            start_date=start_dt, end_date=end_dt,
            output_path=args.out_path, input_path=args.in_path,
-           output_name_pattern=args.output_name_pattern, output_format=args.output_format,
-           aggregation_methods=aggregation_methods)
-
+           output_name_pattern=args.output_name_pattern, output_format=args.output_format)
 
 def main():
     parser = createParser()

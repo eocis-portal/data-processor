@@ -36,25 +36,17 @@ class Aggregator(object):
 
     """
 
-    def __init__(self, lon_min:float, lat_min:float, lon_max:float, lat_max:float, spatial_resolution:float,
+    def __init__(self, spatial_resolution:float,
                  y_dim_name:str, x_dim_name:str, t_dim_name:str):
         """
         Construct the aggregator with the given spatial parameters
 
-        :param lon_min:  minimum longitude of box, must be aligned on 0.05 degree boundary
-        :param lat_min:  minimum latitude of box, must be aligned on 0.05 degree boundary
-        :param lon_max:  maximum longitude of box, must be aligned on 0.05 degree boundary
-        :param lat_max:  maximum latitude of box, must be aligned on 0.05 degree boundary
         :param spatial_resolution: the spatial resolution for the output (set to zero for timeseries, None for original resolution)
         :param y_dim_name: the name of the y dimension
         :param x_dim_name: the name of the x dimension
         :param t_dim_name: the name of the time dimension
 
         """
-        self.lon_min = lon_min
-        self.lon_max = lon_max
-        self.lat_min = lat_min
-        self.lat_max = lat_max
         self.spatial_resolution = spatial_resolution
         self.lat_weighting = None
         self.y_dim_name = y_dim_name
@@ -76,10 +68,7 @@ class Aggregator(object):
         :return: xarray dataset containing aggregated values
         """
 
-        reverse_lat_order = data[self.y_dim_name].values[0] > data[self.y_dim_name].values[-1]
-        data = data.sel({self.t_dim_name:slice(self.format_dt(start_dt),self.format_dt(end_dt)),
-            self.y_dim_name:slice(self.lat_max,self.lat_min) if reverse_lat_order else slice(self.lat_min,self.lat_max),
-            self.x_dim_name:slice(self.lon_min, self.lon_max)})
+        data = data.sel({self.t_dim_name:slice(self.format_dt(start_dt),self.format_dt(end_dt))})
 
         nlat = data.sizes[self.y_dim_name]
         nlon = data.sizes[self.x_dim_name]

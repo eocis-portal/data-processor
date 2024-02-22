@@ -53,7 +53,10 @@ class TaskRunner:
                 v = str(v)
             env[k] = v
 
-        script = os.path.join(thisdir,"task_runner.sh")
+        if task.get_task_type() == "regrid":
+            script = os.path.join(thisdir, "regrid_task_runner.sh")
+        else:
+            script = os.path.join(thisdir, "subset_task_runner.sh")
         cmd = script
         pr = ProcessRunner(cmd, name=name, env_vars=env)
         (retcode, timedout) = pr.run()

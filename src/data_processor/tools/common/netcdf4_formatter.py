@@ -16,15 +16,16 @@
 #    You should have received a copy of the GNU Affero General Public License
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from uuid import uuid4
-import datetime
+import os.path
 
-class Formatter:
+from .formatter import Formatter
+
+class NetCDF4Formatter(Formatter):
     """
-    Create a formatter for writing data to an output file
+    Create a formatter for writing either timeseries or region data to a netcdf4 output file
     """
 
-    def __init__(self, path: str = "", name_pattern: str = ""):
+    def __init__(self,path:str="", name_pattern:str=""):
         """
         Construct the netcdf4 formatter using options
 
@@ -32,33 +33,21 @@ class Formatter:
         :param name_pattern: a pattern to use to create the output file names
 
         """
-        self.output_folder = path
-        self.name_pattern = name_pattern
-        self.uuid = str(uuid4())
+        super().__init__(path, name_pattern)
 
-    def get_output_filename(self, timestamp: datetime.datetime):
+    def write(self, data, variable_names, start_dt=None, mid_dt=None, end_dt=None, original_filename=None):
         """
-        Get the output filename based on a filename pattern that contains the following codes:
-          {Y} 4 digit year
-          {y} 2 digit year
-          {m} 2 digit month
-          {d} 2 digit day of month
-          {H} 2 digit hour
-          {M} 2 digit minute
-          {S} 2 digit second
-
-        Args:
-            timestamp: the datetime object representing the acquisition time
-
-        Returns:
-            filename based on the pattern with codes replaced by data from the timestamp
-
+        Write an entry to the output file covering a time period
+        :param data: an xarray dataset
+        :param variable_names: list of variable names
+        :param start_dt: start date of the period
+        :param mid_dt: mid date of the period
+        :param end_dt: end date of the period
+        :param original_filename: the name of the file yielding the data, if subsetting
         """
-        subs = dict((f, timestamp.strftime('%' + f)) for f in 'yYmdHMS')
-        return self.name_pattern.format(**subs)
-
-    def write(self, start_dt, mid_dt, end_dt, data):
-        pass
+        output_path = os.path.join(self.output_folder,original_filename if original_filename is not None else self.get_output_filename(mid_dt)+".nc")
+        data.to_netcdf(output_path)
 
     def close(self):
         pass
+

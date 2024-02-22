@@ -43,15 +43,15 @@ class CSVFormatter(Formatter):
         self.outfile = None
         self.writer = None
 
-
-    def write(self, start_dt, mid_dt, end_dt, data, variable_names):
+    def write(self, data, variable_names, start_dt=None, mid_dt=None, end_dt=None, original_filename=None):
         """
         Write an entry to the output file covering a time period
+        :param data: an xarray dataset
+        :param variable_names: list of variable names
         :param start_dt: start date of the period
         :param mid_dt: mid date of the period
         :param end_dt: end date of the period
-        :param data: an xarray dataset
-        :param variable_names: list of variable names
+        :param original_filename: the name of the file yielding the data, if subsetting
         """
         if self.outfile is None:
             output_path = os.path.join(self.output_folder,self.get_output_filename(mid_dt) + ".csv")

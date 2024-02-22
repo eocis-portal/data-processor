@@ -17,36 +17,45 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os.path
-import datetime
 
 from .formatter import Formatter
 
-class NetCDF4Formatter(Formatter):
+class GeotiffFormatter(Formatter):
     """
-    Create a formatter for writing either timeseries or region data to a netcdf4 output file
+    Create a formatter for writing spatial data to a geotiff output file
     """
 
     def __init__(self,path:str="", name_pattern:str=""):
         """
-        Construct the netcdf4 formatter using options
+        Construct the geotiff formatter using options
 
         :param path: path of an output folder in which to create the output files
-        :param name_pattern: a pattern to use to create the output file names
+        :param name_pattern: a pattern to use to create the output file names, if needed
 
         """
         super().__init__(path, name_pattern)
 
-    def write(self,start_dt,mid_dt,end_dt,data,variable_names):
+    def write(self,data,variable_names, start_dt=None,mid_dt=None,end_dt=None,original_filename=None):
         """
         Write an entry to the output file covering a time period
+        :param data: an xarray dataset
+        :param variable_names: list of variable names
         :param start_dt: start date of the period
         :param mid_dt: mid date of the period
         :param end_dt: end date of the period
-        :param data: an xarray dataset
-        :param variable_names: list of variable names
+        :param original_filename: the name of the file yielding the data, if subsetting
         """
-        output_path = os.path.join(self.output_folder,self.get_output_filename(mid_dt)+".nc")
-        data.to_netcdf(output_path)
+        for variable_name in variable_names:
+            if original_filename is None:
+                filename = self.get_output_filename(mid_dt) + "-" + variable_name + ".tif"
+            else:
+                filename = os.path.splitext(original_filename)[0]+"-"+variable_name+".tif"
+            output_path = os.path.join(self.output_folder,filename)
+            da = data[variable_name]
+            if "grid_mapping" in da.attrs:
+                del da.attrs["grid_mapping"]
+            da.rio.write_crs("epsg:4326", inplace=True)
+            da.rio.to_raster(output_path)
 
     def close(self):
         pass
