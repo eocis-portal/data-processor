@@ -83,6 +83,7 @@ class Extractor(object):
                 .replace("{DAY}",f"{dt.day:02d}")
 
             matched_paths = glob.glob(input_pattern)
+            # print(input_pattern,len(matched_paths))
             if len(matched_paths) == 1:
                 input_path = matched_paths[0]
                 input_filename = os.path.split(input_path)[-1]
